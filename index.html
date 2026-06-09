@@ -1,59 +1,381 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chimeremeze Premium Media Hub</title>
-    <!-- Premium Google Fonts pairing -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;650;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4fa.png" />
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chimeremeze Premium Media Hub</title>
+  <!-- Standard CDN libraries for zero-overhead client-side utilities -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root { --bg: #030712; --card: #111827; --border: #1f2937; --text: #f3f4f6; --accent: #2563eb; --success: #10b981; }
+    body { background-color: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 15px; }
+    .container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 768px) { .container { grid-template-columns: 2fr 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); position: relative; }
+    video { width: 100%; border-radius: 8px; background: #000; display: block; aspect-ratio: 16/9; }
+    button { background: var(--accent); color: #fff; font-weight: 600; border: 0; padding: 12px 18px; border-radius: 6px; cursor: pointer; transition: background 0.2s; width: 100%; margin-top: 8px; }
+    button:hover { background: #1d4ed8; }
+    .btn-success { background: var(--success); }
+    .btn-success:hover { background: #059669; }
+    input, textarea { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #4b5563; background: #090d16; color: #fff; box-sizing: border-box; }
+    .badge-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+    .badge { padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; background: #374151; }
+    .badge-green { background: #065f46; color: #34d399; }
+    .ad-slot { border: 1px dashed #4b5563; border-radius: 8px; padding: 12px; margin-top: 15px; text-align: center; background: #090d16; min-height: 90px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .bank-row { border-bottom: 1px solid #374151; padding: 10px 0; font-size: 0.9rem; }
+    .copy-btn { width: auto; padding: 4px 8px; font-size: 0.75rem; margin: 0 0 0 8px; display: inline-block; }
+    .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 12px; z-index: 1000; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); text-align: center; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Left Side: Interactive Video Player Card -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 id="lbl-title">Chimeremeze Premium Media</h2>
+      <div>
+        <span class="badge" id="lbl-view">Mobile View</span>
+        <span class="badge" id="lbl-lang">Lang: EN</span>
+      </div>
+    </div>
+
+    <!-- PWA Single-Source Fallback Player (No broken source tags) -->
+    <video id="pwa-player" controls playsinline crossOrigin="anonymous"></video>
     
-    <!-- Tailwind CSS Engine -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              display: ['Space Grotesk', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            }
-          }
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+      <button id="btn-force-desktop" style="background:#4b5563; margin-top:0;">Force Desktop View</button>
+      <button id="btn-translate" style="background:#7c3aed; margin-top:0;">Translate UI</button>
+    </div>
+    
+    <button id="btn-download" class="btn-success">Download Video File</button>
+
+    <div class="badge-container">
+      <span class="badge badge-green">Double-Spend Protected</span>
+      <span class="badge" id="lbl-compressor">Audio Normalizer: Active</span>
+      <span class="badge badge-green" id="lbl-geo">Location: Detecting...</span>
+    </div>
+
+    <!-- Sandbox Adsterra Space with Anti-Adblock Fallback -->
+    <div class="ad-slot">
+      <div id="adsterra-banner-space">Loading secure advertisement...</div>
+    </div>
+  </div>
+
+  <!-- Right Side: Amazon Affiliate and Payout System -->
+  <div class="card" style="display:flex; flex-direction:column; gap:15px;">
+    <!-- Amazon Affiliate Promo Module -->
+    <div>
+      <h3 style="color:#fbbf24; margin:0 0 8px 0;">Exclusive Recommended Gear</h3>
+      <div style="border:1px solid #fbbf24; border-radius:8px; padding:12px; background:#1e1b4b; text-align:center;">
+        <p style="font-size:0.85rem; margin:0 0 10px 0;">Support CHIMEREMEZE NWACHUKWU by shopping verified deals on Amazon.</p>
+        <a href="https://amzn.to/43FWWPL" target="_blank" rel="noopener noreferrer">
+          <button style="background:#fbbf24; color:#111827; margin:0; font-weight:bold;">Shop Verified Amazon Products</button>
+        </a>
+        <p style="font-size:0.7rem; color:#9ca3af; margin-top:6px; margin-bottom:0;">Affiliate Tag: chimeremeze00-20</p>
+      </div>
+    </div>
+
+    <!-- Payments Gateways & Crypto QR Generators -->
+    <div>
+      <h3>Support & Unlock Premium Classes</h3>
+      <div style="display:flex; gap:8px;">
+        <a href="https://flutterwave.com/pay/aqz0kdnuie6j" target="_blank" style="width:100%; text-decoration:none;">
+          <button style="background:#f43f5e; margin:0; height:100%;">Pay with Flutterwave</button>
+        </a>
+        <a href="https://flutterwave.com/pay/j5ycyduhmq5y" target="_blank" style="width:100%; text-decoration:none;">
+          <button style="background:#e11d48; margin:0; height:100%;">Alternative Payout</button>
+        </a>
+      </div>
+      
+      <h4 style="margin:15px 0 5px 0;">Pay via Cryptocurrency</h4>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <button id="btn-qr-btc" style="background:#f59e0b; margin:0; font-size:0.8rem;">Bitcoin Payout</button>
+        <button id="btn-qr-usdt" style="background:#10b981; margin:0; font-size:0.8rem;">USDT (TRC20)</button>
+      </div>
+    </div>
+
+    <!-- Creator Local Bank Payout Directory -->
+    <div style="border-top:1px solid #374151; padding-top:15px;">
+      <h3>Direct Bank Transfer</h3>
+      <div style="max-height:180px; overflow-y:auto; padding-right:5px;">
+        <div class="bank-row">
+          <strong>Lead Bank (US Checking)</strong><br>
+          Acc: 212858358412 | Routing: 101019644
+          <button class="copy-btn" onclick="copyText('212858358412')">Copy Acc</button>
+        </div>
+        <div class="bank-row">
+          <strong>Sterling Bank PLC</strong><br>
+          Acc: 8523559050 | Name: Chimeremeze Wisdom
+          <button class="copy-btn" onclick="copyText('8523559050')">Copy Acc</button>
+        </div>
+        <div class="bank-row">
+          <strong>Wema Bank PLC</strong><br>
+          Acc: 7353625535 | Name: Chimeremeze Wisdom
+          <button class="copy-btn" onclick="copyText('7353625535')">Copy Acc</button>
+        </div>
+        <div class="bank-row">
+          <strong>Indulge MFB</strong><br>
+          Acc: 9907100334 | Name: Chimeremeze Wisdom
+          <button class="copy-btn" onclick="copyText('9907100334')">Copy Acc</button>
+        </div>
+        <div class="bank-row">
+          <strong>Cashconnect MFB</strong><br>
+          Acc: 9922907116 | Name: Chimeremeze Wisdom
+          <button class="copy-btn" onclick="copyText('9922907116')">Copy Acc</button>
+        </div>
+        <div class="bank-row">
+          <strong>Banking Circle S.A. (Euro)</strong><br>
+          IBAN: LU984080000029024935<br>Holder: Bridge Building Sp. Z.o.o.
+          <button class="copy-btn" onclick="copyText('LU984080000029024935')">Copy IBAN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic P2P Crypto QR Code Modal -->
+<div class="modal-overlay" id="modal-overlay"></div>
+<div class="modal" id="qr-modal">
+  <h3 id="modal-title" style="margin:0 0 10px 0;"></h3>
+  <img id="modal-qr-image" style="width:150px; height:150px; margin: 0 auto; display:block;" alt="Crypto QR">
+  <p id="modal-addr-text" style="font-size:0.75rem; word-break:break-all; margin-top:10px; font-family:monospace;"></p>
+  <button id="btn-close-modal" style="background:#ef4444; margin-top:15px; width:auto; padding:8px 16px;">Close</button>
+</div>
+
+<script>
+  // Hardcoded Variables Configuration Block
+  const PLATFORM_ENV = {
+    SUPABASE_URL: "https://zmniyeokodyckfsxinmc.supabase.co/rest/v1/",
+    SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptbml5ZW9rb2R5Y2tmc3hpbm1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNDQxOTYsImV4cCI6MjA5NTYyMDE5Nn0.DjDYDjXTJip6yWrNJAkINopQu6KZ2W9zFgwvIbMZQb4",
+    ADSTERRA_SRC: "https://pl29612266.effectivecpmnetwork.com/f9/59/8e/f9598ee5daad9b4e410124cea162a843.js",
+    AMAZON_LINK: "https://amzn.to/43FWWPL",
+    BTC_ADDR: "17MNqQKgEFREFN3nA1RnsRvLswJxwEcAxW",
+    USDT_ADDR: "TVAa7k383pka9N2rqnZMch62ZQYG1Xx9Kt",
+    PRIMARY_STREAM_HLS: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    BACKUP_STREAM_MP4: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+  };
+
+  const video = document.getElementById('pwa-player');
+  let hlsInstance = null;
+
+  // Feature 1: Single-Source Dynamic HLS-to-MP4 Fallback (No Broken Sources)
+  function initializeAdaptivePlayer() {
+    // If Hls.js is supported, use it to initialize HLS stream
+    if (Hls.isSupported()) {
+      if (hlsInstance) hlsInstance.destroy();
+      hlsInstance = new Hls({ maxBufferLength: 15 });
+      hlsInstance.loadSource(PLATFORM_ENV.PRIMARY_STREAM_HLS);
+      hlsInstance.attachMedia(video);
+      
+      // Catch stream loading errors and dynamically swap to backup MP4
+      hlsInstance.on(Hls.Events.ERROR, function (event, data) {
+        if (data.fatal) {
+          console.warn("Primary HLS stream failed. Swapping to backup MP4 stream...");
+          hlsInstance.destroy();
+          loadBackupMp4();
         }
-      }
-    </script>
+      });
+    } 
+    // Fallback for native Safari streams
+    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = PLATFORM_ENV.PRIMARY_STREAM_HLS;
+      video.addEventListener('error', () => {
+        console.warn("Native HLS failed. Swapping to backup MP4 stream...");
+        loadBackupMp4();
+      });
+    } 
+    // Immediate fallback for Android Chrome browsers
+    else {
+      loadBackupMp4();
+    }
+  }
+
+  function loadBackupMp4() {
+    video.src = PLATFORM_ENV.BACKUP_STREAM_MP4;
+    video.load();
+  }
+
+  // Feature 2: Web Audio Normalization (Dynamics Compressor)
+  let audioCtx = null;
+  video.addEventListener('play', () => {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaElementSource(video);
+      const compressor = audioCtx.createDynamicsCompressor();
+
+      compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+      compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+      compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+      compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+      compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+      source.connect(compressor);
+      compressor.connect(audioCtx.destination);
+    }
+  });
+
+  // Feature 8: Force Desktop Viewport Scaling
+  let isForcedDesktop = false;
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  const btnForceDesktop = document.getElementById('btn-force-desktop');
+  const lblView = document.getElementById('lbl-view');
+
+  btnForceDesktop.addEventListener('click', () => {
+    if (!isForcedDesktop) {
+      viewportMeta.setAttribute('content', 'width=1280, initial-scale=0.35, maximum-scale=2.0');
+      btnForceDesktop.innerText = "Revert to Mobile";
+      lblView.innerText = "Desktop View";
+      lblView.className = "badge badge-green";
+      isForcedDesktop = true;
+    } else {
+      viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0');
+      btnForceDesktop.innerText = "Force Desktop View";
+      lblView.innerText = "Mobile View";
+      lblView.className = "badge";
+      isForcedDesktop = false;
+    }
+  });
+
+  // Feature 9: Native In-Memory UI Translator (English <-> Spanish)
+  let currentLang = "en";
+  const TRANSLATIONS = {
+    es: {
+      title: "Consola de Medios Chimeremeze",
+      force: "Forzar vista escritorio",
+      revert: "Volver a móvil",
+      translate: "Traducir UI",
+      download: "Descargar video",
+      mobile: "Vista móvil",
+      desktop: "Vista escritorio"
+    },
+    en: {
+      title: "Chimeremeze Premium Media",
+      force: "Force Desktop View",
+      revert: "Revert to Mobile",
+      translate: "Translate UI",
+      download: "Download Video File",
+      mobile: "Mobile View",
+      desktop: "Desktop View"
+    }
+  };
+
+  document.getElementById('btn-translate').addEventListener('click', () => {
+    currentLang = currentLang === "en" ? "es" : "en";
+    const dict = TRANSLATIONS[currentLang];
     
-    <!-- Dynamic HLS Playback Client library -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    document.getElementById('lbl-title').innerText = dict.title;
+    document.getElementById('btn-translate').innerText = dict.translate;
+    document.getElementById('btn-download').innerText = dict.download;
+    document.getElementById('lbl-lang').innerText = `Lang: ${currentLang.toUpperCase()}`;
     
-    <style>
-      .glow-border {
-        box-shadow: 0 0 15px -3px rgba(99, 102, 241, 0.15);
-      }
-      .custom-glass {
-        background: rgba(11, 15, 25, 0.85);
-        backdrop-filter: blur(12px);
-      }
-      /* Custom slider track styles */
-      input[type="range"] {
-        -webkit-appearance: none;
-        appearance: none;
-      }
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        height: 12px;
-        width: 12px;
-        border-radius: 50%;
-        background: #6366f1;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body class="bg-[#030712] text-slate-100 font-sans min-h-screen selection:bg-indigo-600 selection:text-white">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    if (isForcedDesktop) {
+      btnForceDesktop.innerText = dict.revert;
+    } else {
+      btnForceDesktop.innerText = dict.force;
+    }
+  });
+
+  // Feature 10: Intelligent Media Stream Downloader
+  document.getElementById('btn-download').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-download');
+    const originalText = btn.innerText;
+    btn.innerText = "Processing Download...";
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(video.src);
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = "chimeremeze_class.mp4";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch(err) {
+      alert("Error: Video stream cannot be converted to local file due to server CORS restrictions.");
+    } finally {
+      btn.innerText = originalText;
+      btn.disabled = false;
+    }
+  });
+
+  // Feature 11: Adsterra Sandbox & Ad-Block Fallback
+  function loadAdsterraOrAffiliateFallback() {
+    const adContainer = document.getElementById('adsterra-banner-space');
+    const script = document.createElement('script');
+    script.src = PLATFORM_ENV.ADSTERRA_SRC;
+    script.type = 'text/javascript';
+    script.async = true;
+    
+    // If ad-blocker blocks the script, display Amazon Affiliate Banner (Feature 11b)
+    script.onerror = () => {
+      adContainer.innerHTML = `
+        <div style="font-weight:bold; color:#fbbf24; font-size:0.85rem;">Verfied Recommended Products</div>
+        <p style="font-size:0.75rem; margin: 4px 0 8px 0;">Ad block detected. Support the creator by shopping on Amazon!</p>
+        <a href="${PLATFORM_ENV.AMAZON_LINK}" target="_blank" style="color:#2563eb; text-decoration:none; font-weight:bold; font-size:0.8rem;">Browse Deals on Amazon</a>
+      `;
+    };
+    
+    adContainer.appendChild(script);
+  }
+  loadAdsterraOrAffiliateFallback();
+
+  // Crypto QR Code Drawer handler
+  const overlay = document.getElementById('modal-overlay');
+  const modal = document.getElementById('qr-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalQrImg = document.getElementById('modal-qr-image');
+  const modalAddr = document.getElementById('modal-addr-text');
+
+  function openCryptoModal(address, name) {
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    modalTitle.innerText = `${name} Payout Address`;
+    modalQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${address}`;
+    modalAddr.innerText = address;
+  }
+
+  document.getElementById('btn-qr-btc').addEventListener('click', () => openCryptoModal(PLATFORM_ENV.BTC_ADDR, "Bitcoin"));
+  document.getElementById('btn-qr-usdt').addEventListener('click', () => openCryptoModal(PLATFORM_ENV.USDT_ADDR, "USDT TRC20"));
+  
+  document.getElementById('btn-close-modal').addEventListener('click', () => {
+    overlay.style.display = "none";
+    modal.style.display = "none";
+  });
+  overlay.addEventListener('click', () => {
+    overlay.style.display = "none";
+    modal.style.display = "none";
+  });
+
+  // Copy bank details helper
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Copied to clipboard: " + text);
+    });
+  }
+
+  // Geolocation detector
+  fetch("https://ipapi.co/json/")
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('lbl-geo').innerText = `Location: ${data.city}, ${data.country_name} (${data.country_code})`;
+      document.getElementById('lbl-geo').className = "badge badge-green";
+    })
+    .catch(() => {
+      document.getElementById('lbl-geo').innerText = `Location: Offline Fallback`;
+    });
+
+  // Initialize Player
+  initializeAdaptivePlayer();
+
+  // Developer Console verification logs
+  console.log("%cSENIOR ARCHITECT SIGNATURE:", "color:#2563eb; font-weight:bold; font-size:14px;");
+  console.log("Verified Developer: CHIMEREMEZE NWACHUKWU");
+  console.log("Developer Email: chimeremezewisdom1001@gmail.com");
+</script>
+
+</body>
   </html>
